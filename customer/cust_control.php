@@ -77,7 +77,6 @@ function hapusKeranjang($username)
     return mysqli_affected_rows($connect);
 }
 
-// Function untuk checkout)
 function checkout($data)
 {
     global $connect;
@@ -90,13 +89,14 @@ function checkout($data)
     $bank = $data["bank"];
     $statusTransaksi = "Tertunda";
     $totalHarga = $data["totalHarga"];
+    $contact = $data["contact"]; // Ini adalah nomor telepon yang akan digunakan
 
     // Simpan data transaksi ke db
     $queryTransaksi = "INSERT INTO transaksi 
         VALUES('$idTransaksi', '$username', '$tanggalTransaksi', '$caraBayar', '$bank', '$statusTransaksi', '$totalHarga', 'Tertunda','')";
     mysqli_query($connect, $queryTransaksi);
 
-    // Update status keranjang menjadi 'Dibayar' dan set idTransaksi
+    // Update status keranjang
     $queryKeranjang = "UPDATE keranjang 
         SET status = 'Dibayar', idTransaksi='$idTransaksi' 
         WHERE username = '$username' && status = 'Belum Dibayar'";
@@ -109,7 +109,6 @@ function checkout($data)
                    WHERE keranjang.username = '$username' AND keranjang.idTransaksi = '$idTransaksi'";
     $resultItems = mysqli_query($connect, $queryItems);
 
-    // Menyimpan semua info ke dalam array
     $items = [];
     while ($row = mysqli_fetch_assoc($resultItems)) {
         $items[] = $row;
@@ -120,7 +119,11 @@ function checkout($data)
     $resultUser = mysqli_query($connect, $queryUser);
     $emailUser = mysqli_fetch_assoc($resultUser)["email"];
 
-    // Membuat invoice pdf menggunakan FPDF
+    // Ambil contact user
+    $contactUser = query("SELECT contact FROM customer WHERE username = '$username'")[0]["contact"];
+    $contact = $contactUser ? $contactUser : $contact; // Gunakan contact dari form jika tidak ada di database
+
+    // Membuat invoice PDF
     $pdf = new FPDF();
     $pdf->AddPage();
 
@@ -137,7 +140,7 @@ function checkout($data)
     $pdf->Cell(0, 10, 'Invoice Belanja', 0, 1, 'C');
     $pdf->Ln(10);
 
-    // Info
+    // Info transaksi
     $pdf->SetFont('Arial', '', 12);
     $pdf->Cell(0, 10, "ID Transaksi: $idTransaksi", 0, 1);
     $pdf->Cell(0, 10, "Nama: $username", 0, 1);
@@ -145,7 +148,7 @@ function checkout($data)
     $pdf->Cell(0, 10, "Metode: $caraBayar via $bank", 0, 1);
     $pdf->Ln(5);
 
-    // Header tabel belanja
+    // Tabel belanja
     $pdf->SetFont('Arial', 'B', 12);
     $pdf->Cell(10, 10, 'No', 1, 0, 'C');
     $pdf->Cell(50, 10, 'ID Produk', 1, 0, 'C');
@@ -154,7 +157,6 @@ function checkout($data)
     $pdf->Cell(30, 10, 'Harga', 1, 0, 'C');
     $pdf->Ln();
 
-    // Data tabel belanja
     $pdf->SetFont('Arial', '', 12);
     $no = 1;
     foreach ($items as $item) {
@@ -165,11 +167,46 @@ function checkout($data)
         $pdf->Cell(30, 10, "Rp" . number_format($item['harga'], 0, ',', '.'), 1, 0, 'C');
         $pdf->Ln();
     }
+
     $pdf->Cell(140, 10, 'Total belanja (termasuk pajak)', 1);
     $pdf->Cell(50, 10, "Rp" . number_format($totalHarga, 0, ',', '.'), 1, 0, 'C');
     $pdf->Ln(20);
 
+    // Virtual account 
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(0, 10, "Informasi Pembayaran", 0, 1);
+    $pdf->SetFont('Arial', '', 12);
+
+    // Format nomor telepon (hilangkan karakter non-digit)
+    $cleanContact = preg_replace('/[^0-9]/', '', $contact);
+
+    // Generate virtual account number
+    $virtualAccount = '';
+    switch (strtoupper($bank)) {
+        case 'BCA':
+            $virtualAccount = '123' . substr($cleanContact, -10); // Ambil 10 digit terakhir
+            break;
+        case 'BNI':
+            $virtualAccount = '456' . substr($cleanContact, -10);
+            break;
+        case 'BRI':
+            $virtualAccount = '789' . substr($cleanContact, -10);
+            break;
+        case 'MANDIRI':
+            $virtualAccount = '147' . substr($cleanContact, -10);
+            break;
+        default:
+            $virtualAccount = 'Siapkan uang tunai untuk COD';
+    }
+
+    // Tambahkan informasi pembayaran yang lebih jelas
+    $pdf->Cell(0, 10, "Via: $bank", 0, 1);
+    $pdf->Cell(0, 10, "Nomor Virtual Account: $virtualAccount", 0, 1);
+    $pdf->Cell(0, 10, "Jumlah yang harus dibayar: Rp" . number_format($totalHarga, 0, ',', '.'), 0, 1);
+    $pdf->Ln(10);
+
     // Tanda tangan
+    $pdf->Cell(0, 10, 'Hormat kami,', 0, 1, 'R');
     $pdf->Cell(0, 10, 'MedShop', 0, 1, 'R');
     $pdf->Image('../img/ttd1.png', 170, $pdf->GetY(), 30);
 
@@ -182,30 +219,40 @@ function checkout($data)
     // Kirim email
     $mail = new PHPMailer(true);
     try {
-        $mail->isSMTP(); // Protokol kirim email
-        $mail->Host = 'smtp.gmail.com'; // SMTP gmail
-        $mail->SMTPAuth = true; // Autentikasi
-        $mail->Username = 'alfinaandriani2902@gmail.com'; // Akun login SMTP
-        $mail->Password = 'ktrithxckdhxoqpb'; // Password SMTP
-        $mail->SMTPSecure = 'tls'; // Enkripsi TLS
-        $mail->Port = 587; // Port SMTP dgn TLS
-        $mail->setFrom('alfinaandriani2902@gmail.com', 'MedShop'); // Pengirim
-        $mail->addAddress($emailUser); // Penerima
-        $mail->Subject = "Invoice Pembayaran - $idTransaksi"; // Subjek email
-        $mail->Body = "Yth. $username, 
+        $mail->isSMTP();
+        $mail->Host = 'smtp.gmail.com';
+        $mail->SMTPAuth = true;
+        $mail->Username = 'alfinaandriani2902@gmail.com';
+        $mail->Password = 'ktrithxckdhxoqpb';
+        $mail->SMTPSecure = 'tls';
+        $mail->Port = 587;
+        $mail->setFrom('alfinaandriani2902@gmail.com', 'MedShop');
+        $mail->addAddress($emailUser);
+        $mail->Subject = "Invoice Pembayaran - $idTransaksi";
 
-                        Terima kasih telah berbelanja di MedShop.
+        // Isi email yang lebih informatif
+        $mail->Body = "Yth. $username,
 
-                        Berikut kami lampirkan invoice pembelian Anda dengan nomor transaksi $idTransaksi pada tanggal $tanggalTransaksi.  
-                        Silakan melakukan pembayaran sesuai dengan metode yang telah Anda pilih.
+Terima kasih telah berbelanja di MedShop.
 
-                        Jika Anda memiliki pertanyaan atau membutuhkan bantuan lebih lanjut, jangan ragu untuk menghubungi tim layanan pelanggan kami.
+Detail Pesanan:
+- Nomor Transaksi: $idTransaksi
+- Tanggal: $tanggalTransaksi
+- Total Pembayaran: Rp" . number_format($totalHarga, 0, ',', '.') . "
+- Metode Pembayaran: $caraBayar via $bank
+- Nomor Virtual Account: $virtualAccount
 
-                        Hormat kami,  
-                        Tim MedShop
-                        ";
-        $mail->addAttachment($lokasiFile); // Lampirkan file PDF
-        $mail->send(); // Kirim email
+Silakan lakukan pembayaran dalam waktu 24 jam ke nomor virtual account di atas.
+
+Invoice lengkap kami lampirkan dalam email ini.
+
+Jika Anda memiliki pertanyaan, silakan hubungi kami.
+
+Hormat kami,
+Tim MedShop";
+
+        $mail->addAttachment($lokasiFile);
+        $mail->send();
     } catch (Exception $e) {
         error_log("Email gagal dikirim: {$mail->ErrorInfo}");
     }

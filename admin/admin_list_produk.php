@@ -6,7 +6,7 @@ require 'admin_control.php';
 require 'header_admin.php';
 require 'sidebar_admin.php';
 
-$allProduk = query("SELECT * FROM produk");
+$allProduk = query("SELECT * FROM produk ORDER BY idProduk DESC");
 
 ?>
 

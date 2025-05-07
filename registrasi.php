@@ -153,11 +153,11 @@ if (isset($_POST["submit"])) {
                                             <div class="invalid-feedback">Silakan masukkan Kontak Anda!</div>
                                         </div>
 
-                                        <div class="col-12">
+                                        <!-- <div class="col-12">
                                             <label for="paypalID" class="form-label">ID Paypal</label>
                                             <input type="number" name="paypalID" class="form-control" id="paypalID" required pattern="[0-9]*">
                                             <div class="invalid-feedback">Silakan masukkan ID paypal Anda!</div>
-                                        </div>
+                                        </div> -->
 
                                         <div class="text-center col-12">
                                             <button type="submit" class="btn btn-primary" name="submit">Submit</button>

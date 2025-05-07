@@ -98,7 +98,7 @@ if (isset($_POST["submit"])) {
 
                     <div class="col-12 mt-2">
                         <label for="paypalID" class="form-label">ID Paypal</label>
-                        <input type="text" class="form-control" id="paypalID" name="paypalID" required pattern="[0-9]*" value="<?= $customer["paypalID"]; ?>">
+                        <input type="text" class="form-control" id="paypalID" name="paypalID" pattern="[0-9]*" value="<?= $customer["paypalID"]; ?>">
                     </div>
 
                     <button type="submit" name="submit" class="btn btn-primary mt-3">Update</button>

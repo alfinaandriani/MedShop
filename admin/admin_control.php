@@ -191,3 +191,45 @@ function tolakTransaksi($idTransaksi)
     }
     return mysqli_affected_rows($connect);
 }
+
+// Function untuk upadate data customer
+function updateCust($data)
+{
+    global $connect;
+
+    // Ambil data dan membersihkan input
+    $username = $data["username"];
+    $password = htmlspecialchars($data["password"]);
+    $namaLengkap = htmlspecialchars($data["namaLengkap"]);
+    $email = htmlspecialchars($data["email"]);
+    $dob = htmlspecialchars($data["dob"]);
+    $gender = htmlspecialchars($data["gender"]);
+    $alamat = htmlspecialchars($data["alamat"]);
+    $kota = htmlspecialchars($data["kota"]);
+    $contact = htmlspecialchars($data["contact"]);
+    $paypalID = htmlspecialchars($data["paypalID"]);
+
+    // Penanganan password
+    if ($password == '') {
+        $password = $data["passwordOLD"]; // Jika password tidak diubah, gunakan password lama
+    } else {
+        $password = password_hash($password, PASSWORD_DEFAULT); // Jika password diubah, hash password baru
+    }
+
+    // Query update menggunakan primary key username
+    $query = "UPDATE customer SET 
+            password = '$password',
+            namaLengkap = '$namaLengkap',
+            email = '$email',
+            dob = '$dob',
+            gender = '$gender',
+            alamat = '$alamat',
+            kota = '$kota',
+            contact = '$contact',
+            paypalID = '$paypalID'
+            WHERE username = '$username'
+            ";
+
+    mysqli_query($connect, $query);
+    return mysqli_affected_rows($connect);
+}
